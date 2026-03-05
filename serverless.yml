@@ -1,0 +1,81 @@
+service: todo-service
+
+package:
+  individually: true
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-api-gateway-caching
+  - serverless-offline
+  # - serverless-plugin-include-dependencies
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  environment:
+    DYNAMODB_TABLE_NAME: TodoTable-${opt:stage, 'dev'}
+  iamRoleStatements:
+    - ${file(resources/Policies.yml):DynamoDBPolicies}
+
+resources:
+  Resources:
+    TodoTable: ${file(resources/TodoTable.yml):TodoTable}
+
+functions:
+  createTodo:
+    handler: src/functions/createTodo.handler
+    events:
+      - http:
+          path: /
+          method: POST
+
+  findTodo:
+    handler: src/functions/findTodo.handler
+    events:
+      - http:
+          path: /
+          method: GET
+          caching:
+            enabled: true
+
+  findTodoById:
+    handler: src/functions/findTodoById.handler
+    events:
+      - http:
+          path: /{id}
+          method: GET
+          caching:
+            enabled: true
+            cacheKeyParameters:
+              - name: request.path.id
+
+  updateTodo:
+    handler: src/functions/updateTodo.handler
+    events:
+      - http:
+          path: /{id}
+          method: PUT
+
+  setDone:
+    handler: src/functions/setDone.handler
+    events:
+      - http:
+          path: /{id}/done
+          method: PATCH
+
+  # deleteTodo:
+  #   handler: src/functions/deleteTodo.handler
+  #   events:
+  #     - http:
+  #         path: /{id}
+  #         method: DELETE
+
+custom:
+  TodoTable:
+    name: !Ref TodoTable
+    arn: !GetAtt TodoTable.Arn
+  apiGatewayCaching:
+    enabled: true
+    ttlInSeconds: 3600
